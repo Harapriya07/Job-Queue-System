@@ -11,7 +11,9 @@ def run_worker():
 
     while True:
         result = redis_client.blpop(QUEUE_NAME, timeout=5)
-
+        if result is None:
+           continue
+        
         job_id = int(result[1])
 
         db = SessionLocal()
