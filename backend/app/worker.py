@@ -30,16 +30,42 @@ def run_worker():
 
             print(f"Processing Job {job_id}: {job.task}")
 
-            time.sleep(3)
+            try:
+                if job.task == "fail":
+                    raise Exception("Task failed intentionally")
 
-            job.status = "COMPLETED"
-            db.commit()
+                time.sleep(3)
 
-            print(f"Job {job_id} completed")
+                job.status = "COMPLETED"
+                db.commit()
 
+                print(f"Job {job_id} completed")
+
+            except Exception as e:
+                job.retry_count += 1
+
+                if job.retry_count <= job.max_retries:
+                    job.status = "QUEUED"
+                    job.error_message = str(e)
+                    db.commit()
+
+                    delay = 2 ** (job.retry_count - 1)
+                    print(f"Waiting {delay} seconds before retrying Job {job_id}")
+                    time.sleep(delay)
+                    redis_client.rpush(QUEUE_NAME, job.id)
+
+                    print(
+                       f"Job {job_id} failed. "
+                       f"Retrying ({job.retry_count}/{job.max_retries})"
+                    )
+                else:
+                    job.status = "FAILED"
+                    job.error_message = str(e)
+                    db.commit()
+
+                    print(f"Job {job_id} permanently failed: {e}")
         finally:
             db.close()
-
 
 if __name__ == "__main__":
     run_worker()
