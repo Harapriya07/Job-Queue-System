@@ -2,14 +2,18 @@ import time
 from app.redis_client import redis_client
 from app.database import SessionLocal
 from app.models import Job
+import uuid
 
 QUEUE_NAME = "jobs_queue"
+WORKER_ID = str(uuid.uuid4())
+HEARTBEAT_KEY = f"worker:{WORKER_ID}:heartbeat"
 
 
 def run_worker():
     print("Worker started. Waiting for jobs...")
 
     while True:
+        send_heartbeat()
         result = redis_client.blpop(QUEUE_NAME, timeout=5)
         if result is None:
            continue
@@ -26,16 +30,18 @@ def run_worker():
                 continue
 
             job.status = "RUNNING"
+            job.worker_id = WORKER_ID
             db.commit()
 
             print(f"Processing Job {job_id}: {job.task}")
 
             try:
-                if job.task == "fail":
+                if job.task == "long_task":
+                    time.sleep(60)
+                elif job.task == "fail":
                     raise Exception("Task failed intentionally")
-
-                time.sleep(3)
-
+                else:
+                    time.sleep(3)
                 job.status = "COMPLETED"
                 db.commit()
 
@@ -67,5 +73,12 @@ def run_worker():
         finally:
             db.close()
 
+def send_heartbeat():
+    redis_client.set(
+        HEARTBEAT_KEY,
+        "alive",
+        ex=15
+    )
+    print(f"Heartbeat sent: {WORKER_ID}")
 if __name__ == "__main__":
     run_worker()

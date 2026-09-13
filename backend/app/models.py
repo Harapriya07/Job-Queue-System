@@ -9,6 +9,7 @@ class Job(Base):
     __tablename__ = "jobs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    worker_id: Mapped[str | None] = mapped_column(String, nullable=True)
     task: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, default="QUEUED", nullable=False)
     retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
