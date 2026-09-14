@@ -22,10 +22,11 @@ def home():
 
 @app.post("/jobs")
 def create_job(job_data: JobCreate, db: Session = Depends(get_db)):
-    job = Job(task=job_data.task,priority=job_data.priority)
+    job = Job(task=job_data.task,priority=job_data.priority,scheduled_at=job_data.scheduled_at)
 
     db.add(job)
     db.commit()
     db.refresh(job)
-    enqueue_job(job.id,job.priority)
+    if job.scheduled_at is None:
+        enqueue_job(job.id,job.priority)
     return job
